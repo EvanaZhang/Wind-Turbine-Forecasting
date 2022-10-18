@@ -1,0 +1,181 @@
+---
+title: "Wind_Turbine_Forcasting"
+author: "Yifei Zhang"
+date: '2022-10-18'
+output: html_document
+---
+# Load in Packages
+```{r, message=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(janitor)
+library(skimr)
+library(kableExtra)
+library(GGally)
+library(vip)        
+library(fastshap)   
+library(MASS)
+library(ISLR)
+library(tree)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(imputeTS)
+library(forecast)
+library(urca)
+library(pracma)
+library(astsa)
+library(fpp2)
+```
+
+# Load in Data
+```{r, message=FALSE}
+wind <- read_csv("Turbine_Data.csv") %>% clean_names()
+head(wind)
+```
+# Checking for missing value for each columns
+```{r, message=FALSE}
+sapply(wind, function(x) sum(is.na(x)))
+```
+
+# Removing missing values
+```{r, message=FALSE}
+wind_clean <- wind %>% na.omit()
+head(wind_clean)
+```
+
+# Aggregation method: average
+```{r, message=FALSE}
+wind_daily <- wind_clean %>% 
+  group_by(year, month, day) %>% 
+  summarise(active_power = mean(active_power),
+            ambient_temperature = mean(ambient_temperature),
+            wind_direction = mean(wind_direction),
+            wind_speed = mean(wind_speed))
+
+wind_daily$date <- as.Date(with(wind_daily, paste(year, month, day, sep = "-")), "%Y-%m-%d")
+wind_daily <- subset(wind_daily, select = -c(year, month, day))
+wind_daily %>% head()
+```
+# Create time series object & plot time series
+```{r}
+wind1 <- subset(wind_daily, select = c(active_power))
+
+wind_ts1 <- ts(wind1, start = c(2018,1,1), frequency = 365)
+```
+
+# Testing White Noise
+```{r, message=FALSE}
+Box.test(wind_ts1, lag = 6, fitdf = 0, type = "Lj")
+```
+
+# Decompose
+```{r}
+plot(decompose(wind_ts1))
+plot(wind_ts1)
+
+ggAcf(wind_ts1)
+ggPacf(wind_ts1)
+```
+
+# Scatter plots (Testing on explanatory variables and target variable on average)
+```{r, message=FALSE}
+ggplot(wind_daily, aes(x = ambient_temperature, y = active_power)) +
+  geom_point() +
+  labs(title = "Relationship Between Ambient Temperature & Active Power",
+        subtitle = "Wind Turbine Dataset")
+
+ggplot(wind_daily, aes(x = wind_direction, y = active_power)) +
+  geom_point() +
+  labs(title = "Relationship Between Wind Direction & Active Power",
+        subtitle = "Wind Turbine Dataset")
+
+ggplot(wind_daily, aes(x = wind_speed, y = active_power)) +
+  geom_point() + 
+  labs(title = "Relationship Between Wind Speed & Active Power",
+        subtitle = "Wind Turbine Dataset")
+```
+
+# Model 1: Which explanatory variables are important? 
+```{r}
+fit1_AR1 <- sarima(wind_ts1, 0, 0, 0, xreg=wind_daily[,2:4])
+summary(fit1_AR1)
+fit1_AR1
+```
+
+# Model 2
+```{r}
+fit1_AR2 <- sarima(wind_ts1, 1,1,0, xreg = wind_daily[,2:4])
+summary(fit1_AR2)
+fit1_AR2
+```
+
+# Model 3
+```{r}
+fit1_AR3 <- sarima(wind_ts1, 1,1,1, xreg = wind_daily[,2:4])
+summary(fit1_AR3)
+fit1_AR3
+```
+
+# Final Model
+```{r}
+fit1 <- Arima(wind_ts1, order = c(1,1,1))
+summary(fit1)
+
+checkresiduals(fit1)
+forecast(fit1, h = 5)
+autoplot(forecast(fit1, h=5))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
